@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:activiti="http://activiti.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://www.collibra.com/apiv2">
+  <collaboration id="Collaboration">
+    <participant id="workflow" name="Workflow" processRef="dcaAutoEvaluate"></participant>
+  </collaboration>
+  <process id="dcaAutoEvaluate" name="DCA Automatic Evaluate" isExecutable="true">
+    <documentation>Evaluate assets of a predetermined community, set by the communityId variable, and determine they're data criticality. This workflow will only run on UIF's and Columns in the selected community.</documentation>
+    <laneSet id="laneSet_dcaAutoEvaluate">
+      <lane id="lane1">
+        <flowNodeRef>startevent1</flowNodeRef>
+        <flowNodeRef>endevent1</flowNodeRef>
+        <flowNodeRef>scripttask1</flowNodeRef>
+      </lane>
+    </laneSet>
+    <startEvent id="startevent1" name="Start">
+      <extensionElements>
+        <activiti:formProperty id="metricAttributeId" name="Metric Attribute ID" type="string" default="ec9180ea-dc3e-4f9a-95d9-157e1a685269" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="uniqueIdentifierId" name="Unique Identifier ID" type="string" default="a6c7a5b4-135e-4a58-8239-832b796ce668" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="multiSystemId" name="Multi System ID" type="string" default="bcabba1e-29dc-43f9-8171-db32047b7717" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="hierarchicalId" name="Hierarchical ID" type="string" default="a447da3f-3aac-43ee-9f33-71e7a8debb2c" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="dataTypeId" name="Data Type ID" type="string" default="5530400f-2aa8-4370-b3de-c17b07ab8539" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="mdeIDKey" name="MDE ID Key" type="string" default="79dee746-0e57-48e2-bff5-a265f9313320" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="sdeIDKey" name="SDE ID Key" type="string" default="dbe2d82b-387f-4d54-ad41-48d8cddbaf95" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="UIFRelationship" name="User Interface Field Relationship ID" type="string" default="d6ffc755-1bcb-4461-ad77-32c1054a9b12" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="columnRelationship" name="Column Relationship" type="string" default="97023b62-67a4-48f7-beba-972a2239e804" readable="false"></activiti:formProperty>
+        <activiti:formProperty id="dataCriticalityAttributeId" name="Attribute ID for Data Criticality" type="string" default="5530400f-2aa8-4370-b3de-c17b07ab8539" readable="false" required="true"></activiti:formProperty>
+        <activiti:formProperty id="communityID" name="ID of the Community this workflow will run on" type="string" default="4bcd8f80-4b79-4f13-bde3-e022dd6ec29d" readable="false" required="true"></activiti:formProperty>
+        <activiti:formProperty id="UIFTypeID" name="Asset Type ID for User Interface Field" type="string" default="b87e1965-d773-4f76-b1ce-4fef7ae7044e" readable="false" required="true"></activiti:formProperty>
+        <activiti:formProperty id="columnTypeID" name="Asset Type ID for Column" type="string" default="00000000-0000-0000-0000-000000031008" readable="false" required="true"></activiti:formProperty>
+      </extensionElements>
+      <timerEventDefinition>
+        <timeCycle>* * * * * ?</timeCycle>
+      </timerEventDefinition>
+    </startEvent>
+    <endEvent id="endevent1" name="End"></endEvent>
+    <scriptTask id="scripttask1" name="Evaluate Data Element" scriptFormat="groovy" activiti:autoStoreVariables="false">
+      <script><![CDATA[import com.collibra.dgc.core.api.model.instance.attribute.Attribute
+import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest
+import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest.Builder
+import com.collibra.dgc.core.api.dto.instance.asset.FindAssetsRequest
+import com.collibra.dgc.core.api.dto.instance.asset.FindAssetsRequest.Builder
+import static com.collibra.dgc.core.api.dto.SortOrder.ASC
+import static com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest.SortField.LAST_MODIFIED
+
+import com.collibra.dgc.core.api.component.instance.AssetApi
+import com.collibra.dgc.core.api.model.instance.Asset
+import com.collibra.dgc.core.api.component.instance.RelationApi
+import com.collibra.dgc.core.api.component.logger.LoggerApi
+import com.collibra.dgc.core.api.dto.instance.relation.FindRelationsRequest
+import com.collibra.dgc.core.api.dto.instance.relation.FindRelationsRequest.Builder
+import com.collibra.dgc.core.api.component.meta.AssetTypeApi
+import com.collibra.dgc.core.api.component.meta.AttributeTypeApi
+import com.collibra.dgc.core.api.dto.instance.complexrelation.AttributeValue
+import com.collibra.dgc.core.api.dto.meta.assettype.FindAssetTypesRequest
+import com.collibra.dgc.core.api.dto.meta.assettype.FindAssetTypesRequest.Builder
+import com.collibra.dgc.core.api.model.meta.type.AssetType
+import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest.Builder
+import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest
+
+import com.collibra.dgc.core.api.dto.instance.attribute.ChangeAttributeRequest
+
+def metricAttributeId = string2Uuid(execution.getVariable("metricAttributeId"))
+def uniqueIdentifierId = string2Uuid(execution.getVariable("uniqueIdentifierId"))
+def multiSystemId = string2Uuid(execution.getVariable("multiSystemId"))
+def hierarchicalId = string2Uuid(execution.getVariable("hierarchicalId"))
+def dataTypeId = string2Uuid(execution.getVariable("dataTypeId"))
+def mdeIDKey = execution.getVariable("mdeIDKey")
+def sdeIDKey = execution.getVariable("sdeIDKey")
+
+
+//Keys for relationships
+def UIFRelationship = execution.getVariable("UIFRelationship")
+def columnRelationship = execution.getVariable("columnRelationship")
+
+
+def assetList = assetApi.findAssets(FindAssetsRequest.builder()
+	.communityId(string2Uuid(communityID))
+	.typeIds([string2Uuid(UIFTypeID), string2Uuid(columnTypeID)]).build())
+	.getResults()
+
+
+loggerApi.info("Asset List : " + assetList)
+
+for( thisAsset in assetList) {
+
+def sdeBool = false
+def mdeBool = false
+def kpiBool = false
+def uniqueIdBool= false
+def multiSystemBool = false
+def hierarchicalBool = false
+
+
+//Get all source relations of currently selected asset
+def relationsResponse = relationApi.findRelations(
+	FindRelationsRequest.builder()
+		.sourceId(thisAsset.id)
+		.build()
+	)
+
+for(relation in relationsResponse.getResults()) {
+	
+	Asset currentAsset = assetApi.getAsset(relation.target.id)
+	currentAssetType = currentAsset.getType().getId().toString()
+	loggerApi.info("CurrentAsset type : " + currentAssetType)
+	loggerApi.info("SDE Key " + sdeIDKey)
+	loggerApi.info("Current Relation Type: " + relation.getType().getId().toString())
+	
+	uifOrColumRelationBool = false
+	if(relation.getType().getId().toString() == UIFRelationship || relation.getType().getId().toString() == columnRelationship) {
+		uifOrColumRelationBool = true
+	}
+	loggerApi.info("uifOrColumRelationBool: " + uifOrColumRelationBool)
+	
+	currentAssetStatusBool = false
+	if(currentAsset.getStatus().getName().toString() == 'Approved' || currentAsset.getStatus().getName().toString() == 'Accepted') {
+		loggerApi.info("Flipping status bool to true")
+		currentAssetStatusBool = true
+	}
+	loggerApi.info("currentAssetStatusBool: " + currentAssetStatusBool)
+		
+	if(currentAssetType == mdeIDKey && currentAssetStatusBool && uifOrColumRelationBool) {
+		loggerApi.info("Switching mdeBool to True")
+		mdeBool = true
+	}
+	else if(currentAssetType == sdeIDKey && currentAssetStatusBool && uifOrColumRelationBool) {
+		loggerApi.info("Switching sdeBool to True")
+		sdeBool = true
+	}
+	
+}
+
+//Get all target relations of currently selected asset
+def targetRelationsResponse = relationApi.findRelations(
+	FindRelationsRequest.builder()
+		.targetId(thisAsset.id)
+		.build()
+	)
+
+for(relation in targetRelationsResponse.getResults()) {
+	
+	Asset currentAsset = assetApi.getAsset(relation.source.id)
+	currentAssetType = currentAsset.getType().getId().toString()
+	loggerApi.info("CurrentAsset type : " + currentAssetType)
+	loggerApi.info("SDE Key " + sdeIDKey)
+	loggerApi.info("Current Relation Type: " + relation.getType().getId().toString())
+	
+	uifOrColumRelationBool = false
+	if(relation.getType().getId().toString() == UIFRelationship || relation.getType().getId().toString() == columnRelationship) {
+		uifOrColumRelationBool = true
+	}
+	loggerApi.info("uifOrColumRelationBool: " + uifOrColumRelationBool)
+	
+	currentAssetStatusBool = false
+	if(currentAsset.getStatus().getName().toString() == 'Approved' || currentAsset.getStatus().getName().toString() == 'Accepted') {
+		loggerApi.info("Flipping status bool to true")
+		currentAssetStatusBool = true
+	}
+	
+	loggerApi.info("currentAssetStatusBool: " + currentAssetStatusBool)
+	
+	if(currentAssetType == mdeIDKey && currentAssetStatusBool && uifOrColumRelationBool) {
+		loggerApi.info("Switching mdeBool to True")
+		mdeBool = true
+	}
+	else if(currentAssetType == sdeIDKey && currentAssetStatusBool && uifOrColumRelationBool) {
+		loggerApi.info("Switching sdeBool to True")
+		sdeBool = true
+	}
+	
+}
+
+
+//Get Used in Enterprise Metric or KPI attribute
+kpiBool = getAttribute(metricAttributeId, thisAsset)
+loggerApi.info("KPI Bool: " + kpiBool)
+
+uniqueIdBool = getAttribute(uniqueIdentifierId, thisAsset)
+loggerApi.info("Unique ID Bool: " + uniqueIdBool)
+
+multiSystemBool = getAttribute(multiSystemId, thisAsset)
+loggerApi.info("MultiSystem Bool: " + multiSystemBool)
+
+hierarchicalBool = getAttribute(hierarchicalId, thisAsset)
+loggerApi.info("Hierarchical Bool: " + hierarchicalBool)
+
+loggerApi.info("Sde Bool: " + sdeBool)
+loggerApi.info("MDE Bool: " + mdeBool)
+
+
+if( mdeBool == false && sdeBool == false && kpiBool == null && multiSystemBool == null && uniqueIdBool == null && hierarchicalBool == null)
+	setDcaAttribute("Needs Assessment", thisAsset)
+else if(mdeBool)
+	setDcaAttribute("Enterprise Master Data", thisAsset)
+else if(sdeBool)
+	setDcaAttribute("Enterprise Shared Data", thisAsset)
+else if(kpiBool)
+	setDcaAttribute("Enterprise Master Data", thisAsset)
+else if(multiSystemBool == false)
+	setDcaAttribute("Single Application Data", thisAsset)
+else if(multiSystemBool == null)
+	setDcaAttribute("Needs Assessment", thisAsset)
+else if(uniqueIdBool)
+	setDcaAttribute("Enterprise Master Data", thisAsset)
+else if(hierarchicalBool)
+	setDcaAttribute("Enterprise Master Data", thisAsset)
+else if(!hierarchicalBool )
+	setDcaAttribute("Enterprise Shared Data", thisAsset)
+else
+	loggerApi.warn("No logic exists to change DCA type")
+
+}
+
+def setDcaAttribute(dataValue, thisAsset) {
+	
+	assetApi.setAssetAttributes(
+		SetAssetAttributesRequest.builder()
+			.assetId(thisAsset.id)
+			.values([dataValue])
+			.typeId(string2Uuid(dataCriticalityAttributeId))
+			.build()
+		)
+}
+def changeAttribute(dataTypeAttributeId, dataValue) {
+	attributeApi.changeAttribute(
+		ChangeAttributeRequest.builder()
+			.id(dataTypeAttributeId)
+			.value(dataValue)
+			.build()
+		)
+}
+def getAttribute(attributeId, thisAsset) {
+	try {
+		assetAttributesResponse = attributeApi.findAttributes(
+			FindAttributesRequest.builder()
+				.assetId(thisAsset.id)
+				.typeIds([attributeId])
+				.build()
+		)
+		loggerApi.info("Attributes Response: " + assetAttributesResponse)
+		return assetAttributesResponse.results[0].value
+	
+	} catch(Exception e) {
+		loggerApi.info("Exception: " + e)
+		return null
+	}
+	
+}
+
+
+]]></script>
+    </scriptTask>
+    <sequenceFlow id="flow1" sourceRef="startevent1" targetRef="scripttask1"></sequenceFlow>
+    <sequenceFlow id="flow2" sourceRef="scripttask1" targetRef="endevent1"></sequenceFlow>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Collaboration">
+    <bpmndi:BPMNPlane bpmnElement="Collaboration" id="BPMNPlane_Collaboration">
+      <bpmndi:BPMNShape bpmnElement="workflow" id="BPMNShape_workflow">
+        <omgdc:Bounds height="150.0" width="500.0" x="220.0" y="300.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="lane1" id="BPMNShape_lane1">
+        <omgdc:Bounds height="150.0" width="480.0" x="240.0" y="300.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="startevent1" id="BPMNShape_startevent1">
+        <omgdc:Bounds height="35.0" width="35.0" x="290.0" y="370.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endevent1" id="BPMNShape_endevent1">
+        <omgdc:Bounds height="35.0" width="35.0" x="550.0" y="370.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="scripttask1" id="BPMNShape_scripttask1">
+        <omgdc:Bounds height="81.0" width="125.0" x="360.0" y="347.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="flow1" id="BPMNEdge_flow1">
+        <omgdi:waypoint x="325.0" y="387.0"></omgdi:waypoint>
+        <omgdi:waypoint x="360.0" y="387.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow2" id="BPMNEdge_flow2">
+        <omgdi:waypoint x="485.0" y="387.0"></omgdi:waypoint>
+        <omgdi:waypoint x="550.0" y="387.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
