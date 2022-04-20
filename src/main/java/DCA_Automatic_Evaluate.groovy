@@ -3,9 +3,11 @@ import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest
 import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest.Builder
 import com.collibra.dgc.core.api.dto.instance.asset.FindAssetsRequest
 import com.collibra.dgc.core.api.dto.instance.asset.FindAssetsRequest.Builder
+import com.collibra.dgc.core.api.model.instance.Domain
+import com.collibra.dgc.core.api.dto.instance.domain.FindDomainsRequest
+import com.collibra.dgc.core.api.dto.instance.domain.FindDomainsRequest.Builder
 import static com.collibra.dgc.core.api.dto.SortOrder.ASC
 import static com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest.SortField.LAST_MODIFIED
-
 import com.collibra.dgc.core.api.component.instance.AssetApi
 import com.collibra.dgc.core.api.model.instance.Asset
 import com.collibra.dgc.core.api.component.instance.RelationApi
@@ -20,8 +22,8 @@ import com.collibra.dgc.core.api.dto.meta.assettype.FindAssetTypesRequest.Builde
 import com.collibra.dgc.core.api.model.meta.type.AssetType
 import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest.Builder
 import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest
-
 import com.collibra.dgc.core.api.dto.instance.attribute.ChangeAttributeRequest
+
 
 def metricAttributeId = string2Uuid(execution.getVariable("metricAttributeId"))
 def uniqueIdentifierId = string2Uuid(execution.getVariable("uniqueIdentifierId"))
@@ -36,14 +38,29 @@ def sdeIDKey = execution.getVariable("sdeIDKey")
 def UIFRelationship = execution.getVariable("UIFRelationship")
 def columnRelationship = execution.getVariable("columnRelationship")
 
-
-def assetList = assetApi.findAssets(FindAssetsRequest.builder()
+def domainList = domainApi.findDomains(FindDomainsRequest.builder()
+	.typeId(string2Uuid(PDDTypeID))
+	.includeSubCommunities(true)
 	.communityId(string2Uuid(communityID))
-	.typeIds([string2Uuid(UIFTypeID), string2Uuid(columnTypeID)]).build())
+	.build())
 	.getResults()
 
+loggerApi.info("Domains: " + domainList)
 
-loggerApi.info("Asset List : " + assetList)
+def assetList = []
+for (domain in domainList) {
+	loggerApi.info("Domain ID: " + domain.getId())
+	assetList += assetApi.findAssets(FindAssetsRequest.builder()
+	.domainId(domain.getId())
+	.typeIds([string2Uuid(UIFTypeID), string2Uuid(columnTypeID)]).build())
+	.getResults()
+	loggerApi.info("Current AssetList: " + assetList)
+	
+}
+
+
+
+loggerApi.info("Total asset List : " + assetList)
 
 for( thisAsset in assetList) {
 

@@ -27,6 +27,7 @@
         <activiti:formProperty id="communityID" name="ID of the Community this workflow will run on" type="string" default="4bcd8f80-4b79-4f13-bde3-e022dd6ec29d" readable="false" required="true"></activiti:formProperty>
         <activiti:formProperty id="UIFTypeID" name="Asset Type ID for User Interface Field" type="string" default="b87e1965-d773-4f76-b1ce-4fef7ae7044e" readable="false" required="true"></activiti:formProperty>
         <activiti:formProperty id="columnTypeID" name="Asset Type ID for Column" type="string" default="00000000-0000-0000-0000-000000031008" readable="false" required="true"></activiti:formProperty>
+        <activiti:formProperty id="PDDTypeID" name="Domain Type ID for the Physical Data Dictionary" type="string" default="00000000-0000-0000-0000-000000030011" readable="false" required="true"></activiti:formProperty>
       </extensionElements>
       <timerEventDefinition>
         <timeCycle>* * * * * ?</timeCycle>
@@ -39,9 +40,11 @@ import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest
 import com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest.Builder
 import com.collibra.dgc.core.api.dto.instance.asset.FindAssetsRequest
 import com.collibra.dgc.core.api.dto.instance.asset.FindAssetsRequest.Builder
+import com.collibra.dgc.core.api.model.instance.Domain
+import com.collibra.dgc.core.api.dto.instance.domain.FindDomainsRequest
+import com.collibra.dgc.core.api.dto.instance.domain.FindDomainsRequest.Builder
 import static com.collibra.dgc.core.api.dto.SortOrder.ASC
 import static com.collibra.dgc.core.api.dto.instance.attribute.FindAttributesRequest.SortField.LAST_MODIFIED
-
 import com.collibra.dgc.core.api.component.instance.AssetApi
 import com.collibra.dgc.core.api.model.instance.Asset
 import com.collibra.dgc.core.api.component.instance.RelationApi
@@ -56,8 +59,8 @@ import com.collibra.dgc.core.api.dto.meta.assettype.FindAssetTypesRequest.Builde
 import com.collibra.dgc.core.api.model.meta.type.AssetType
 import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest.Builder
 import com.collibra.dgc.core.api.dto.instance.asset.SetAssetAttributesRequest
-
 import com.collibra.dgc.core.api.dto.instance.attribute.ChangeAttributeRequest
+
 
 def metricAttributeId = string2Uuid(execution.getVariable("metricAttributeId"))
 def uniqueIdentifierId = string2Uuid(execution.getVariable("uniqueIdentifierId"))
@@ -72,14 +75,29 @@ def sdeIDKey = execution.getVariable("sdeIDKey")
 def UIFRelationship = execution.getVariable("UIFRelationship")
 def columnRelationship = execution.getVariable("columnRelationship")
 
-
-def assetList = assetApi.findAssets(FindAssetsRequest.builder()
+def domainList = domainApi.findDomains(FindDomainsRequest.builder()
+	.typeId(string2Uuid("00000000-0000-0000-0000-000000030021"))
+	.includeSubCommunities(true)
 	.communityId(string2Uuid(communityID))
-	.typeIds([string2Uuid(UIFTypeID), string2Uuid(columnTypeID)]).build())
+	.build())
 	.getResults()
 
+loggerApi.info("Domains: " + domainList)
+def assetList = []
+for (domain in domainList) {
+	loggerApi.info("Domain: " + domain)
+	loggerApi.info("Domain ID: " + domain.getId())
+	assetList += assetApi.findAssets(FindAssetsRequest.builder()
+	.domainId(domain.getId())
+	.typeIds([string2Uuid(UIFTypeID), string2Uuid(columnTypeID)]).build())
+	.getResults()
+	loggerApi.info("Current AssetList: " + assetList)
+	
+}
 
-loggerApi.info("Asset List : " + assetList)
+
+
+loggerApi.info("Total asset List : " + assetList)
 
 for( thisAsset in assetList) {
 
@@ -262,7 +280,7 @@ def getAttribute(attributeId, thisAsset) {
         <omgdc:Bounds height="150.0" width="480.0" x="240.0" y="300.0"></omgdc:Bounds>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="startevent1" id="BPMNShape_startevent1">
-        <omgdc:Bounds height="35.0" width="35.0" x="290.0" y="370.0"></omgdc:Bounds>
+        <omgdc:Bounds height="35.0" width="35.0" x="300.0" y="370.0"></omgdc:Bounds>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape bpmnElement="endevent1" id="BPMNShape_endevent1">
         <omgdc:Bounds height="35.0" width="35.0" x="550.0" y="370.0"></omgdc:Bounds>
@@ -271,7 +289,7 @@ def getAttribute(attributeId, thisAsset) {
         <omgdc:Bounds height="81.0" width="125.0" x="360.0" y="347.0"></omgdc:Bounds>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge bpmnElement="flow1" id="BPMNEdge_flow1">
-        <omgdi:waypoint x="325.0" y="387.0"></omgdi:waypoint>
+        <omgdi:waypoint x="335.0" y="387.0"></omgdi:waypoint>
         <omgdi:waypoint x="360.0" y="387.0"></omgdi:waypoint>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge bpmnElement="flow2" id="BPMNEdge_flow2">
