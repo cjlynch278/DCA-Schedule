@@ -24,13 +24,13 @@
         <activiti:formProperty id="UIFRelationship" name="User Interface Field Relationship ID" type="string" default="d6ffc755-1bcb-4461-ad77-32c1054a9b12" readable="false"></activiti:formProperty>
         <activiti:formProperty id="columnRelationship" name="Column Relationship" type="string" default="97023b62-67a4-48f7-beba-972a2239e804" readable="false"></activiti:formProperty>
         <activiti:formProperty id="dataCriticalityAttributeId" name="Attribute ID for Data Criticality" type="string" default="5530400f-2aa8-4370-b3de-c17b07ab8539" readable="false" required="true"></activiti:formProperty>
-        <activiti:formProperty id="communityID" name="ID of the Community this workflow will run on" type="string" default="4bcd8f80-4b79-4f13-bde3-e022dd6ec29d" readable="false" required="true"></activiti:formProperty>
+        <activiti:formProperty id="communityID" name="ID of the Community this workflow will run on" type="string" default="6e5a5bcc-909d-429c-a59a-f40505dcd393" readable="false" required="true"></activiti:formProperty>
         <activiti:formProperty id="UIFTypeID" name="Asset Type ID for User Interface Field" type="string" default="b87e1965-d773-4f76-b1ce-4fef7ae7044e" readable="false" required="true"></activiti:formProperty>
         <activiti:formProperty id="columnTypeID" name="Asset Type ID for Column" type="string" default="00000000-0000-0000-0000-000000031008" readable="false" required="true"></activiti:formProperty>
         <activiti:formProperty id="PDDTypeID" name="Domain Type ID for the Physical Data Dictionary" type="string" default="00000000-0000-0000-0000-000000030011" readable="false" required="true"></activiti:formProperty>
       </extensionElements>
       <timerEventDefinition>
-        <timeCycle>* * * * * ?</timeCycle>
+        <timeCycle>* */30 * * * ?</timeCycle>
       </timerEventDefinition>
     </startEvent>
     <endEvent id="endevent1" name="End"></endEvent>
@@ -76,16 +76,16 @@ def UIFRelationship = execution.getVariable("UIFRelationship")
 def columnRelationship = execution.getVariable("columnRelationship")
 
 def domainList = domainApi.findDomains(FindDomainsRequest.builder()
-	.typeId(string2Uuid("00000000-0000-0000-0000-000000030021"))
+	.typeId(string2Uuid(PDDTypeID))
 	.includeSubCommunities(true)
 	.communityId(string2Uuid(communityID))
 	.build())
 	.getResults()
 
 loggerApi.info("Domains: " + domainList)
+
 def assetList = []
 for (domain in domainList) {
-	loggerApi.info("Domain: " + domain)
 	loggerApi.info("Domain ID: " + domain.getId())
 	assetList += assetApi.findAssets(FindAssetsRequest.builder()
 	.domainId(domain.getId())
